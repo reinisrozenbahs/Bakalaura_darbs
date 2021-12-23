@@ -67,8 +67,7 @@ while is_running:
     joints.append(joint1)
     joints.append(joint2)
 
-
-    L_mse = np.sum((target_point-joint2)**2)
+    #L_mse = np.sum((target_point-joint2)**2)
 
     d_theta1 = np.sum(dR1 @ segment * -2 * (target_point - joint2))
     d_theta2 = np.sum(R1 @ dR2 @ segment * -2 * (target_point - joint2))
