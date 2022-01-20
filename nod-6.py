@@ -8,8 +8,11 @@ Y = np.array([2.1, 4.0, 5.5, 8.9])
 W = np.array([0.1, 0.1, 0.1])
 b = np.array([0.1, 0.1, 0.1])
 
-
-
+#W1 = np.zeros((1, 8))
+#b1 = np.zeros((8, ))
+#W2 = np.zeros((8, 1))
+#b2 = np.zeros((1, ))
+#prod_W = np.squeeze(W.T @ np.expand_dims(x, axis=-1), axis=-1)
 
 def linear(W, b, x):
     return W * x + b
