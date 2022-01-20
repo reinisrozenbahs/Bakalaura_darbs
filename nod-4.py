@@ -25,25 +25,25 @@ def da_sigmoid(a):
     return np.exp(-a)/(2 * (np.exp(-a) + 1))
 
 def model(W, b, x):
-    return sigmoid(linear(W, b, x)) * 20.0
+    return sigmoid(linear(W,b,x)) * 20
 
 def dW_model(W, b, x):
-    return sigmoid(dW_linear(W, b, x)) * 20.0
+    return (x * np.exp(-(W * x + b))) / (np.exp(-(W * x + b)) + 1)**2
 
 def db_model(W, b, x):
-    return sigmoid(db_linear(W, b, x)) * 20.0
+    return np.exp(-(W * x + b)) / (np.exp(-(W * x + b)) + 1)**2
 
 def f_loss(y, y_prim):
     return np.mean((y - y_prim) ** 2)
 
 def f_dW_loss(y, y_prim, W, b, x): # derivative WRT Loss function
-    return -2*(y - y_prim) * (x * np.exp(-(W * x + b))) / (np.exp(-(W * x + b)) + 1)**2
+    return -2*(y - y_prim) * dW_model(W, b, x)
 
 def f_db_loss(y, y_prim, W, b, x):
-    return -2*(y - y_prim) * np.exp(-(W * x + b)) / (np.exp(-(W * x + b)) + 1)**2
+    return -2*(y - y_prim) * db_model(W, x, b)
 
 
-learning_rate = 2e-2
+learning_rate = 1e-2
 for epoch in range(1000):
 
     Y_prim = model(W, b, X)

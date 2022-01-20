@@ -1,20 +1,20 @@
 import numpy as np
-
 import matplotlib
+import matplotlib.pyplot as plt
 matplotlib.use("TkAgg")
 
-import matplotlib.pyplot as plt
-plt.rcParams["figure.figsize"] = (10,10)
+
+plt.rcParams["figure.figsize"] = (10, 10)
 plt.ion()
 
 
 def rotation_mat(degrees):
     theta = np.radians(degrees)
-    C = np.cos(theta)
-    S = np.sin(theta)
+    c = np.cos(theta)
+    s = np.sin(theta)
     R = np.array([
-        [C, S*(-1), 0],
-        [S, C, 0],
+        [c, -s, 0],
+        [s, c, 0],
         [0, 0, 1]
     ])
     return R
@@ -146,7 +146,7 @@ class Asteroid(Character):
         x_ofs = np.random.rand() * 20 - 10
         y_ofs = np.random.rand() * 20 - 10
         r_val = np.random.rand() * 1.25
-        for i in range(360):
+        for i in range(0,360,10):
             r_ofs = np.random.rand() / 4
             x = x_ofs + (r_val + r_ofs) * np.cos(np.radians(i))
             y = y_ofs + (r_val + r_ofs) * np.sin(np.radians(i))
