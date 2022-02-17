@@ -134,11 +134,6 @@ class LayerLinear:
         self.W.grad += np.expand_dims(self.x.value, axis=-1) @ np.expand_dims(self.output.grad, axis=-2)
         self.x.grad += np.squeeze(self.W.value @ np.expand_dims(self.output.grad, axis=-1), axis=-1)
 
-#x_dummy = Variable(value=np.random.random(size=(BATCH_SIZE, 7)))
-#linear_dummy = LayerLinear(in_features=7, out_features=2)
-#y_dummy = linear_dummy.forward(x_dummy)
-#linear_dummy.backward()
-#exit()
 
 class LayerSigmoid():
     def __init__(self):
@@ -223,20 +218,6 @@ class LossMAE():
     def backward(self):
         self.y_prim.grad += -(self.y.value - self.y_prim.value)/ np.abs(self.y.value - self.y_prim.value)
 
-# class LossHuber():
-#     def __init__(self, sigma):
-#         self.y = None
-#         self.y_prim = None
-#         self.sigma = sigma
-#
-#     def forward(self, y: Variable, y_prim: Variable):
-#         self.y = y
-#         self.y_prim = y_prim
-#         loss = np.mean(np.abs(y.value - y_prim.value))
-#         return loss
-#
-#     def backward(self):
-#         self.y_prim.grad += -(self.y.value - self.y_prim.value)/ np.abs(self.y.value - self.y_prim.value)
 
 class HuberLoss():
 
@@ -253,7 +234,7 @@ class HuberLoss():
         return np.mean(self.delta**2 * (np.sqrt(1 + ((y.value - y_prim.value) / self.delta)**2) - 1))
 
     def backward(self):
-        self.y_prim.grad += -self.delta**2 * ((self.y.value - self.y_prim.value) / (np.sqrt(1 + ((self.y.value - self.y_prim.value) / self.delta)**2) - 1))
+        self.y_prim.grad += -(self.delta**2 * np.mean((self.y.value - self.y_prim.value) / np.sqrt(((self.y.value - self.y_prim.value) / self.delta)**2 + 1)))
 
 def f_nmrse(y, y_prim):
     mrse_val = (np.mean(np.square(y_prim.value - y.value))) ** (1 / 2)
@@ -263,6 +244,7 @@ def f_nmrse(y, y_prim):
 def f_r_square(y, y_prim):
     res_val = np.sum(np.square(y_prim.value - y.value))
     tot_val = np.sum(np.square(y.value - np.mean(y.value)))
+    print(f"res_val: {res_val}, tot_val: {tot_val}")
     return 1 - (res_val / tot_val)
 
 class Model:
@@ -320,9 +302,11 @@ optimizer = OptimizerSGD(
 )
 loss_fn = HuberLoss(delta=0.5)
 
+
 loss_plot_train = []
 loss_plot_test = []
 error_plot_test = []
+error_plot = []
 for epoch in range(1, 1000):
 
     for dataloader in [dataloader_train, dataloader_test]:
@@ -340,7 +324,7 @@ for epoch in range(1, 1000):
 
                 optimizer.step()
                 optimizer.zero_grad()
-
+        error_plot.append(np.mean(error_plot_test))
         if dataloader == dataloader_train:
             loss_plot_train.append(np.mean(losses))
         else:
@@ -357,5 +341,14 @@ for epoch in range(1, 1000):
         ax1.set_xlabel("Epoch")
         ax1.set_ylabel("Loss")
         plt.show()
+
+    # print(f'epoch: {error_plot[-1]}')
+    # if epoch % 15 == 0:
+    #     fig, ax1 = plt.subplots()
+    #     ax1.plot(error_plot, 'r-', label='R^2')
+    #     ax1.legend()
+    #     ax1.set_xlabel("Epoch")
+    #     ax1.set_ylabel("Error")
+    #     plt.show()
 
 

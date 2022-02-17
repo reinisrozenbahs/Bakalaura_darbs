@@ -13,7 +13,7 @@ plt.style.use('dark_background')
 
 LEARNING_RATE = 1e-1
 BATCH_SIZE = 16
-TRAIN_TEST_SPLIT = 0.8
+TRAIN_TEST_SPLIT = 0.7
 
 class Dataset(torch.utils.data.Dataset):
     def __init__(self):
@@ -50,6 +50,13 @@ class Dataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         return np.array(self.X[idx]), np.array(self.X_classes[idx]), np.array(self.Y[idx])
 
+dataset_full = Dataset()
+train_test_split = int(len(dataset_full) * TRAIN_TEST_SPLIT)
+dataset_train, dataset_test = torch.utils.data.random_split(
+    dataset_full,
+    [train_test_split, len(dataset_full) - train_test_split],
+    generator=torch.Generator().manual_seed(0)
+)
 
 class DataLoader:
     def __init__(
@@ -81,20 +88,18 @@ class DataLoader:
         self.idx_batch += 1
         return batch
 
-dataset_full = Dataset()
-train_test_split = int(len(dataset_full) * TRAIN_TEST_SPLIT)
 
-dataloader_train = DataLoader(
-    dataset_full,
-    idx_start=0,
-    idx_end=train_test_split,
-    batch_size=BATCH_SIZE
+
+dataloader_train = torch.utils.data.DataLoader(
+    dataset=dataset_train,
+    batch_size=BATCH_SIZE,
+    shuffle=True
 )
-dataloader_test = DataLoader(
-    dataset_full,
-    idx_start=train_test_split,
-    idx_end=len(dataset_full),
-    batch_size=BATCH_SIZE
+
+dataloader_test = torch.utils.data.DataLoader(
+    dataset=dataset_test,
+    batch_size=BATCH_SIZE,
+    shuffle=True
 )
 
 class Variable:
@@ -147,8 +152,8 @@ class Model(torch.nn.Module):
                 emb.forward(x_classes[:, i])
             )
 
-        x_emb = torch.tensor(torch.cat(x_emb_list, dim=-1))
-        x_cat = torch.cat([torch.tensor(x), x_emb], dim=-1)
+        x_emb = torch.cat(x_emb_list, dim=-1)
+        x_cat = torch.cat([x, x_emb], dim=-1)
 
         y_prim = self.layers.forward(x_cat)
         return y_prim
@@ -165,7 +170,8 @@ class HuberLoss(torch.nn.Module):
         return torch.mean(self.delta**2 * (torch.sqrt(1 + ((y - y_prim) / self.delta)**2) - 1))
 
     def backward(self, y_prim, y):
-        return torch.mean(self.delta**2 * (torch.sqrt(1 + ((y - y_prim) / self.delta)**2) - 1)) - 1
+        #return torch.mean(self.delta**2 * (torch.sqrt(1 + ((y - y_prim) / self.delta)**2) - 1)) - torch.mean(self.delta**2 * torch.mean((y - y_prim) / torch.sqrt(((y - y_prim) / self.delta)**2 + 1)))
+        return torch.mean(self.delta**2 * torch.mean((y - y_prim) / torch.sqrt(((y - y_prim) / self.delta)**2 + 1)))
 
 model = Model()
 optimizer = torch.optim.Adam(
@@ -186,14 +192,14 @@ for epoch in range(1, 1000):
         losses = []
         for x, x_classes, y in dataloader:
 
-            y_prim = model.forward(x, torch.tensor(x_classes))
-            loss = loss_fn.forward(torch.tensor(y_prim), torch.tensor(y))
+            y_prim = model.forward(x, x_classes)
+            loss = loss_fn.forward(y_prim, y)
 
             losses.append(loss.item())
 
 
             if dataloader == dataloader_train:
-                loss = loss_fn.backward(torch.tensor(y_prim), torch.tensor(y))
+                loss = loss_fn.backward(y_prim, y)
                 optimizer.step()
                 optimizer.zero_grad()
 
@@ -202,6 +208,17 @@ for epoch in range(1, 1000):
         else:
             loss_plot_test.append(np.mean(losses))
 
+    print(f'epoch: {epoch} loss_train: {loss_plot_train[-1]} loss_test: {loss_plot_test[-1]}')
+    if epoch % 20 == 0:
+        fig, ax1 = plt.subplots()
+        ax1.plot(loss_plot_train, 'r-', label='train')
+        ax2 = ax1.twinx()
+        ax2.plot(loss_plot_test, 'c-', label='test')
+        ax1.legend()
+        ax2.legend(loc='upper left')
+        ax1.set_xlabel("Epoch")
+        ax1.set_ylabel("Loss")
+        plt.show()
     # print(
     #     f'epoch: {epoch} '
     #     f'loss_train: {loss_plot_train[-1]} '
@@ -210,25 +227,25 @@ for epoch in range(1, 1000):
     #     f'acc_test: {acc_plot_test[-1]}'
     # )
 
-    if epoch % 10 == 0:
-        _, axes = plt.subplots(nrows=2, ncols=1)
-        ax1 = axes[0]
-        #ax1.title("Loss")
-        ax1.plot(loss_plot_train, 'r-', label='train')
-        ax2 = ax1.twinx()
-        ax2.plot(loss_plot_test, 'c-', label='test')
-        ax1.legend()
-        ax2.legend(loc='upper left')
-        ax1.set_xlabel("Epoch")
-        ax1.set_ylabel("Loss")
-
-        ax1 = axes[1]
-        #ax1.title("Acc")
-        ax1.plot(acc_plot_train, 'r-', label='train')
-        ax2 = ax1.twinx()
-        ax2.plot(acc_plot_test, 'c-', label='test')
-        ax1.legend()
-        ax2.legend(loc='upper left')
-        ax1.set_xlabel("Epoch")
-        ax1.set_ylabel("Acc.")
-        plt.show()
+    # if epoch % 10 == 0:
+    #     _, axes = plt.subplots(nrows=2, ncols=1)
+    #     ax1 = axes[0]
+    #     #ax1.title("Loss")
+    #     ax1.plot(loss_plot_train, 'r-', label='train')
+    #     ax2 = ax1.twinx()
+    #     ax2.plot(loss_plot_test, 'c-', label='test')
+    #     ax1.legend()
+    #     ax2.legend(loc='upper left')
+    #     ax1.set_xlabel("Epoch")
+    #     ax1.set_ylabel("Loss")
+    #
+    #     ax1 = axes[1]
+    #     #ax1.title("Acc")
+    #     ax1.plot(acc_plot_train, 'r-', label='train')
+    #     ax2 = ax1.twinx()
+    #     ax2.plot(acc_plot_test, 'c-', label='test')
+    #     ax1.legend()
+    #     ax2.legend(loc='upper left')
+    #     ax1.set_xlabel("Epoch")
+    #     ax1.set_ylabel("Acc.")
+    #     plt.show()
