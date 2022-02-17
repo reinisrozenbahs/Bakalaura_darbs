@@ -22,9 +22,9 @@ def normalize(x):
 class Dataset:
     def __init__(self):
         super().__init__()
-        path_dataset = '../data/cardekho_india_dataset.pkl'
+        path_dataset = '../../data/cardekho_india_dataset.pkl'
         if not os.path.exists(path_dataset):
-            os.makedirs('../data', exist_ok=True)
+            os.makedirs('../../data', exist_ok=True)
             download_url_to_file(
                 'http://share.yellowrobot.xyz/1630528570-intro-course-2021-q4/cardekho_india_dataset.pkl',
                 path_dataset,
@@ -155,6 +155,21 @@ class LayerSigmoid():
     def backward(self):
         self.x.grad += self.output.value * (1 - self.output.value) * self.output.grad
 
+class LayerSwish():
+    def __init__(self):
+        self.x = None
+        self.output = None
+
+    def forward(self, x: Variable):
+        self.x = x
+        self.output = Variable(
+            x.value / (1.0 + np.exp(-x.value))
+        )
+        return self.output
+
+    def backward(self):
+
+        self.x.grad += (self.output.value + (1.0 / (1.0 + np.exp(-self.x.value))) * (1 - self.output.value)) * self.output.grad
 
 class LayerReLU:
     def __init__(self):
@@ -163,27 +178,20 @@ class LayerReLU:
 
     def forward(self, x: Variable):
         self.x = x
-        x_prim = x.value
-        #for elem in np.nditer(x_prim, op_flags=['readwrite']):
-        for elem in range(len(x_prim)):
-            if x_prim[elem].any() < 0:
-                x_prim[elem] = 0
+        x_out = np.array(x.value)
+
+        x_out[x_out < 0] = 0
 
         self.output = Variable(
-            x_prim
+            x_out
         )
-        #print(self.output.value)
         return self.output
 
     def backward(self):
         for elem in self.output.value:
-            if elem.all() >= 0:
-                self.x.grad += 1 * self.output.grad
-        #for elem in self.output.value:
-            #if elem >= 0:
-                #self.x.grad += 1 * self.output.grad
-            #else:
-                #self.x.grad += 0 * self.output.grad
+            for elem_2 in elem:
+                if elem_2 > 0:
+                    self.x.grad += 1 * self.output.grad
 
 
 class LossMSE():
@@ -215,24 +223,59 @@ class LossMAE():
     def backward(self):
         self.y_prim.grad += -(self.y.value - self.y_prim.value)/ np.abs(self.y.value - self.y_prim.value)
 
-class NRMSE:
-    def __init__(self):
-        self.y = None
+# class LossHuber():
+#     def __init__(self, sigma):
+#         self.y = None
+#         self.y_prim = None
+#         self.sigma = sigma
+#
+#     def forward(self, y: Variable, y_prim: Variable):
+#         self.y = y
+#         self.y_prim = y_prim
+#         loss = np.mean(np.abs(y.value - y_prim.value))
+#         return loss
+#
+#     def backward(self):
+#         self.y_prim.grad += -(self.y.value - self.y_prim.value)/ np.abs(self.y.value - self.y_prim.value)
 
-    def MRSE(self, y: Variable):
+class HuberLoss():
+
+    def __init__(self, delta):
+        super().__init__()
+        self.y = None
+        self.y_prim = None
+        self.delta = delta
+
+
+    def forward(self, y: Variable, y_prim: Variable):
         self.y = y
-        mrse_val = (np.sum(y.value - np.average(y.value))/np.size(y.value))**(1/2)
-        return mrse_val
+        self.y_prim = y_prim
+        return np.mean(self.delta**2 * (np.sqrt(1 + ((y.value - y_prim.value) / self.delta)**2) - 1))
+
+    def backward(self):
+        self.y_prim.grad += -self.delta**2 * ((self.y.value - self.y_prim.value) / (np.sqrt(1 + ((self.y.value - self.y_prim.value) / self.delta)**2) - 1))
+
+def f_nmrse(y, y_prim):
+    mrse_val = (np.mean(np.square(y_prim.value - y.value))) ** (1 / 2)
+    stdev_val = np.std(y.value)
+    return mrse_val / stdev_val
+
+def f_r_square(y, y_prim):
+    res_val = np.sum(np.square(y_prim.value - y.value))
+    tot_val = np.sum(np.square(y.value - np.mean(y.value)))
+    return 1 - (res_val / tot_val)
 
 class Model:
     def __init__(self):
         self.layers = [
             LayerLinear(in_features=7, out_features=4),
-            LayerSigmoid(),
+            #LayerSigmoid(),
             #LayerReLU(),
+            LayerSwish(),
             LayerLinear(in_features=4, out_features=4),
-            LayerSigmoid(),
+            #LayerSigmoid(),
             #LayerReLU(),
+            LayerSwish(),
             LayerLinear(in_features=4, out_features=1)
         ]
 
@@ -275,11 +318,11 @@ optimizer = OptimizerSGD(
     model.parameters(),
     learning_rate=LEARNING_RATE
 )
-loss_fn = LossMSE()
-
+loss_fn = HuberLoss(delta=0.5)
 
 loss_plot_train = []
 loss_plot_test = []
+error_plot_test = []
 for epoch in range(1, 1000):
 
     for dataloader in [dataloader_train, dataloader_test]:
@@ -288,7 +331,7 @@ for epoch in range(1, 1000):
 
             y_prim = model.forward(Variable(value=x))
             loss = loss_fn.forward(Variable(value=y), y_prim)
-
+            error_plot_test.append(np.mean(f_r_square(Variable(value=y), y_prim)))
             losses.append(loss)
 
             if dataloader == dataloader_train:
@@ -304,9 +347,7 @@ for epoch in range(1, 1000):
             loss_plot_test.append(np.mean(losses))
 
     print(f'epoch: {epoch} loss_train: {loss_plot_train[-1]} loss_test: {loss_plot_test[-1]}')
-    #mrse_val = (np.sum(losses - np.average(losses)) / np.size(losses)) ** (1 / 2)
-    #print(mrse_val)
-    if epoch % 20 == 0:
+    if epoch % 50 == 0:
         fig, ax1 = plt.subplots()
         ax1.plot(loss_plot_train, 'r-', label='train')
         ax2 = ax1.twinx()
@@ -316,3 +357,5 @@ for epoch in range(1, 1000):
         ax1.set_xlabel("Epoch")
         ax1.set_ylabel("Loss")
         plt.show()
+
+
