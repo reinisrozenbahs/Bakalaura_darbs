@@ -102,14 +102,6 @@ dataloader_test = torch.utils.data.DataLoader(
     shuffle=True
 )
 
-class Variable:
-    def __init__(self, value, grad=None):
-        self.value: np.ndarray = value
-        self.grad: np.ndarray = np.zeros_like(value)
-        if grad is not None:
-            self.grad = grad
-
-
 class OptimizerSGD:
     def __init__(self, parameters, learning_rate):
         self.parameters = parameters
@@ -171,7 +163,7 @@ class HuberLoss(torch.nn.Module):
 
     def backward(self, y_prim, y):
         #return torch.mean(self.delta**2 * (torch.sqrt(1 + ((y - y_prim) / self.delta)**2) - 1)) - torch.mean(self.delta**2 * torch.mean((y - y_prim) / torch.sqrt(((y - y_prim) / self.delta)**2 + 1)))
-        return torch.mean(self.delta**2 * torch.mean((y - y_prim) / torch.sqrt(((y - y_prim) / self.delta)**2 + 1)))
+        return -torch.mean(self.delta**2 * torch.mean((y - y_prim) / torch.sqrt(((y - y_prim) / self.delta)**2 + 1)))
 
 model = Model()
 optimizer = torch.optim.Adam(
@@ -209,7 +201,7 @@ for epoch in range(1, 1000):
             loss_plot_test.append(np.mean(losses))
 
     print(f'epoch: {epoch} loss_train: {loss_plot_train[-1]} loss_test: {loss_plot_test[-1]}')
-    if epoch % 20 == 0:
+    if epoch % 50 == 0:
         fig, ax1 = plt.subplots()
         ax1.plot(loss_plot_train, 'r-', label='train')
         ax2 = ax1.twinx()
