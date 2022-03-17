@@ -36,12 +36,13 @@ class Dataset(torch.utils.data.Dataset):
 
         X_tmp = np.array(X_tmp)
         X_classes = np.array(X_tmp[:, :4])
-
+        #print(X_classes)
         self.Y = X_classes[:, 1]
         self.Y_prob = self.Y #TODO
 
-        self.X_classes = np.concatenate((X_classes[:, :1], X_classes[:, 2:]), axis=-1)
-
+        #self.X_classes = np.concatenate((X_classes[:, :1], X_classes[:, 2:]), axis=-1)
+        self.X_classes = X_classes
+        #print(self.X_classes)
         X_tmp = np.array(X_tmp[:, 4:]).astype(np.float32)
         Y_tmp = np.expand_dims(Y_tmp, axis=-1).astype(np.float32)
         self.X = np.concatenate((X_tmp, Y_tmp), axis=-1)
@@ -82,10 +83,10 @@ class Model(torch.nn.Module):
         super().__init__()
 
         self.layers = torch.nn.Sequential(
-            torch.nn.Linear(in_features=3 + 3 * 4, out_features=8),
-            torch.nn.Sigmoid(),
+            torch.nn.Linear(in_features=4 + 3 * 4, out_features=8),
+            torch.nn.Softmax(dim=-1),
             torch.nn.Linear(in_features=8, out_features=4),
-            torch.nn.Sigmoid(),
+            torch.nn.Softmax(dim=-1),
             torch.nn.Linear(in_features=4, out_features=1)
         )
 
@@ -98,14 +99,15 @@ class Model(torch.nn.Module):
                 )
             )
 
-    def forward(self, x, x_classes):
+    def forward(self, x, X_classes):
         x_emb_list = []
         for i, emb in enumerate(self.embs):
             x_emb_list.append(
-                emb.forward(x_classes[:, i])
+                emb.forward(X_classes[:, i])
             )
         x_emb = torch.cat(x_emb_list, dim=-1)
         x_cat = torch.cat([x, x_emb], dim=-1)
+        #print(x_cat.size())
         y_prim = self.layers.forward(x_cat)
         return y_prim
 
@@ -115,8 +117,7 @@ class LossCCE(torch.nn.Module):
         super().__init__()
 
     def forward(self, y_prim, y):
-        # TODO
-        return 0
+        return torch.mean(-y/(y_prim + 1e-8))
 
 model = Model()
 optimizer = torch.optim.Adam(
@@ -151,7 +152,9 @@ for epoch in range(1, 1000):
 
             losses.append(loss.item())
 
-            acc = 0 # TODO
+            y_idx = torch.argmax(y, axis=-1)
+            y_prim_idx = torch.argmax(y_prim, axis=-1)
+            acc = torch.mean((y_idx == y_prim_idx) * 1.0)
             accs.append(acc)
 
             f1s = 0 # TODO
