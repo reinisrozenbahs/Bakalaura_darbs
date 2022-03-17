@@ -38,7 +38,11 @@ class Dataset(torch.utils.data.Dataset):
         X_classes = np.array(X_tmp[:, :4])
         #print(X_classes)
         self.Y = X_classes[:, 1]
-        self.Y_prob = self.Y #TODO
+
+        self.Y_prob = torch.zeros((len(self.Y), len(self.labels[1])))
+
+        idx_range = range(len(self.Y))
+        self.Y_prob[idx_range, self.Y] = 1.0
 
         #self.X_classes = np.concatenate((X_classes[:, :1], X_classes[:, 2:]), axis=-1)
         self.X_classes = X_classes
@@ -84,9 +88,9 @@ class Model(torch.nn.Module):
 
         self.layers = torch.nn.Sequential(
             torch.nn.Linear(in_features=4 + 3 * 4, out_features=8),
-            torch.nn.Softmax(dim=-1),
+            torch.nn.Sigmoid(),
             torch.nn.Linear(in_features=8, out_features=4),
-            torch.nn.Softmax(dim=-1),
+            torch.nn.Sigmoid(),
             torch.nn.Linear(in_features=4, out_features=1)
         )
 
