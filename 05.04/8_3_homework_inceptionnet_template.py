@@ -61,25 +61,7 @@ class DatasetApples(torch.utils.data.Dataset):
         return x, y
 
 
-dataset_full = DatasetApples()
-train_test_split = int(len(dataset_full) * TRAIN_TEST_SPLIT)
-dataset_train, dataset_test = torch.utils.data.random_split(
-    dataset_full,
-    [train_test_split, len(dataset_full) - train_test_split],
-    generator=torch.Generator().manual_seed(0)
-)
 
-data_loader_train = torch.utils.data.DataLoader(
-    dataset=dataset_train,
-    batch_size=BATCH_SIZE,
-    shuffle=True
-)
-
-data_loader_test = torch.utils.data.DataLoader(
-    dataset=dataset_test,
-    batch_size=BATCH_SIZE,
-    shuffle=False
-)
 
 class LossCrossEntropy(torch.nn.Module):
     def __init__(self):
@@ -136,15 +118,15 @@ class InceptionNet(torch.nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.conv1 = torch.nn.conv2d(in_channels=3, out_channels=32,
+        self.conv1 = torch.nn.Conv2d(in_channels=3, out_channels=32,
                                     kernel_size=(5, 5), bias=False)
 
         self.max_pool = torch.nn.MaxPool2d(kernel_size=2)
 
-        self.conv2 = torch.nn.conv2d(in_channels=256, out_channels=32,
+        self.conv2 = torch.nn.Conv2d(in_channels=256, out_channels=32,
                                     kernel_size=(5, 5), bias=False)
-        self.in_block_1 = InceptionBlockA()
-        self.in_block_2 = InceptionBlockA()
+        self.in_block_1 = InceptionBlockA(in_channels=32)
+        self.in_block_2 = InceptionBlockA(in_channels=32)
 
         self.linear = torch.nn.Linear(256, 10)
 
@@ -166,7 +148,11 @@ class InceptionNet(torch.nn.Module):
 
         return out
 
-
+x = torch.randn(size=(64,3,100,100))
+model = InceptionNet()
+y = model.forward(x)
+print(y.shape)
+quit()
 model = InceptionNet()
 loss_func = LossCrossEntropy()
 optimizer = torch.optim.RMSprop(model.parameters(), lr=1e-4)

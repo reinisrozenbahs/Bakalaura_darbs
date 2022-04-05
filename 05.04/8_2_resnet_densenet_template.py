@@ -270,6 +270,12 @@ class Model(torch.nn.Module):
         out = F.softmax(out, dim=1)
         return out
 
+x = torch.randn(size=(64,3,100,100))
+model = ModelResnet()
+y = model.forward(x)
+print(y.shape)
+quit()
+
 model = Model()
 loss_func = LossCrossEntropy()
 optimizer = torch.optim.RMSprop(model.parameters(), lr=1e-4)
