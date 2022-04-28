@@ -32,7 +32,7 @@ if USE_CUDA:
 class DatasetApples(torch.utils.data.Dataset):
     def __init__(self):
         super().__init__()
-        path_dataset = '../data/apples_dataset.pkl'
+        path_dataset = './apples_dataset.pkl'
         if not os.path.exists(path_dataset):
             os.makedirs('../../../data', exist_ok=True)
             download_url_to_file(
@@ -270,13 +270,13 @@ class Model(torch.nn.Module):
         out = F.softmax(out, dim=1)
         return out
 
-x = torch.randn(size=(64,3,100,100))
-model = ModelResnet()
-y = model.forward(x)
-print(y.shape)
-quit()
+#x = torch.randn(size=(64,3,100,100))
+#model = ModelResnet()
+#y = model.forward(x)
+#print(y.shape)
+#quit()
 
-model = Model()
+model = ModelResnet()
 loss_func = LossCrossEntropy()
 optimizer = torch.optim.RMSprop(model.parameters(), lr=1e-4)
 
@@ -293,7 +293,7 @@ for stage in ['train', 'test']:
     ]:
         metrics[f'{stage}_{metric}'] = []
 
-for epoch in range(1, 100):
+for epoch in range(1, 20):
 
     for data_loader in [data_loader_train, data_loader_test]:
         metrics_epoch = {key: [] for key in metrics.keys()}
@@ -361,6 +361,14 @@ for epoch in range(1, 100):
         color = 'green' if idx_y_prim[i]==idx_y[i] else 'red'
         plt.title(f"pred: {idx_y_prim[i]}\n real: {idx_y[i]}", c=color)
         plt.imshow(x[i].permute(1, 2, 0))
+
+    conf_matrix = np.zeros((idx_y_prim.size, idx_y.size))
+    for idx in range(idx_y_prim.size):
+        i = idx_y_prim[idx]
+        j = idx_y[idx]
+        conf_matrix[i,j] +=1
+
+    print(conf_matrix)
 
     plt.tight_layout(pad=0.5)
     plt.draw()

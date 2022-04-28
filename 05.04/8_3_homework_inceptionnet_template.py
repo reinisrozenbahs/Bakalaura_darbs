@@ -73,16 +73,16 @@ class LossCrossEntropy(torch.nn.Module):
 
 class InceptionBlockA(torch.nn.Module):
 
-    def __init__(self, in_channels):
+    def __init__(self, in_channels, out_channels):
         super().__init__()
 
-        self.conv1 = torch.nn.Conv2d(in_channels=in_channels, out_channels=32,
+        self.conv1 = torch.nn.Conv2d(in_channels=in_channels, out_channels=out_channels,
                                      kernel_size=(1, 1), bias=False)
 
         self.conv2_1 = torch.nn.Conv2d(in_channels=in_channels, out_channels=32,
                                      kernel_size=(1, 1), bias=False)
 
-        self.conv2_2 = torch.nn.Conv2d(in_channels=32, out_channels=64,
+        self.conv2_2 = torch.nn.Conv2d(in_channels=32, out_channels=out_channels,
                                      kernel_size=(5, 5), padding=(2,2), bias=False)
 
         self.conv3_1 = torch.nn.Conv2d(in_channels=in_channels, out_channels=32,
@@ -91,15 +91,15 @@ class InceptionBlockA(torch.nn.Module):
         self.conv3_2 = torch.nn.Conv2d(in_channels=32, out_channels=64,
                                        kernel_size=(3, 3), padding=(1,1), bias=False)
 
-        self.conv3_3 = torch.nn.Conv2d(in_channels=64, out_channels=128,
+        self.conv3_3 = torch.nn.Conv2d(in_channels=64, out_channels=out_channels,
                                        kernel_size=(3, 3), padding=(1,1), bias=False)
 
-        self.avg_pool = torch.nn.AvgPool2d(kernel_size=3, padding=1)
+        self.avg_pool = torch.nn.AvgPool2d(kernel_size=1, padding=0)
 
-        self.conv4 = torch.nn.Conv2d(in_channels=in_channels, out_channels=32,
+        self.conv4 = torch.nn.Conv2d(in_channels=in_channels, out_channels=out_channels,
                                      kernel_size=(1, 1), bias=False)
 
-        self.bn = torch.nn.BatchNorm2d(num_features=in_channels)
+        self.bn = torch.nn.BatchNorm2d(num_features=256)
 
     def forward(self, x):
 
@@ -107,8 +107,13 @@ class InceptionBlockA(torch.nn.Module):
         conv2 = self.conv2_2.forward(self.conv2_1.forward(x))
         conv3 = self.conv3_3.forward(self.conv3_2.forward(self.conv3_1.forward(x)))
         conv4 = self.conv4.forward(self.avg_pool.forward(x))
+        #print(conv1.shape)
+        #print(conv2.shape)
+        #print(conv3.shape)
+        #print(conv4.shape)
         output = torch.cat([conv1, conv2, conv3, conv4], dim=1)
         output = F.relu(output)
+        #print(output.shape)
         output = self.bn.forward(output)
 
         return output
@@ -125,8 +130,8 @@ class InceptionNet(torch.nn.Module):
 
         self.conv2 = torch.nn.Conv2d(in_channels=256, out_channels=32,
                                     kernel_size=(5, 5), bias=False)
-        self.in_block_1 = InceptionBlockA(in_channels=32)
-        self.in_block_2 = InceptionBlockA(in_channels=32)
+        self.in_block_1 = InceptionBlockA(in_channels=32, out_channels=64)
+        self.in_block_2 = InceptionBlockA(in_channels=32, out_channels=64)
 
         self.linear = torch.nn.Linear(256, 10)
 
@@ -142,13 +147,13 @@ class InceptionNet(torch.nn.Module):
         out = F.relu(out)
 
         out = self.in_block_2.forward(out)
-        out = self.linear.forward(out)
+        #out = self.linear.forward(out)
 
         out = F.softmax(out)
 
         return out
 
-x = torch.randn(size=(64,3,100,100))
+x = torch.randn(size=(32,3,100,100))
 model = InceptionNet()
 y = model.forward(x)
 print(y.shape)
