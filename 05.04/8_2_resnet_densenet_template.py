@@ -370,6 +370,19 @@ for epoch in range(1, 20):
 
     print(conf_matrix)
 
+    for i in range(idx_y_prim.size):
+        TP = 0
+        FP = 0
+        FN = 0
+        TN = 0
+        TP += conf_matrix[i, i]
+        FP += conf_matrix[i,:].sum() - conf_matrix[i,i]
+        FN += conf_matrix[:,i].sum() - conf_matrix[i,i]
+        TN += conf_matrix[:,:].sum() - conf_matrix[i,:].sum() - conf_matrix[:,i].sum()
+        F_Score = TP / (TP + 0.5 * (FP * FN))
+        #print(TP, FP, FN, TN)
+        print(F_Score)
+
     plt.tight_layout(pad=0.5)
     plt.draw()
     plt.pause(0.1)
