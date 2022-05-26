@@ -9,10 +9,14 @@ import torch
 import numpy as np
 import matplotlib
 import torchvision
+import torchvision.transforms as transforms
 from torch.hub import download_url_to_file
 from tqdm import tqdm
 
 import matplotlib.pyplot as plt
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+
 plt.rcParams["figure.figsize"] = (15, 5)
 plt.style.use('dark_background')
 
@@ -29,57 +33,30 @@ MAX_LEN = 200 # limit max number of samples otherwise too slow training (on GPU 
 if USE_CUDA:
     MAX_LEN = None
 
-class DatasetApples(torch.utils.data.Dataset):
-    def __init__(self):
-        super().__init__()
-        path_dataset = './apples_dataset.pkl'
-        if not os.path.exists(path_dataset):
-            os.makedirs('../../../data', exist_ok=True)
-            download_url_to_file(
-                'http://share.yellowrobot.xyz/1630528570-intro-course-2021-q4/apples_dataset.pkl',
-                path_dataset,
-                progress=True
-            )
-        with open(path_dataset, 'rb') as fp:
-            X, Y, self.labels = pickle.load(fp)
+batch_size_train = 64
+batch_size_test = 1000
 
-        X = torch.from_numpy(np.array(X))
-        self.X = X.permute(0, 3, 1, 2)
-        self.input_size = self.X.size(-1)
-        Y = torch.LongTensor(Y)
-        self.Y = F.one_hot(Y)
-
-    def __len__(self):
-        if MAX_LEN:
-            return MAX_LEN
-        return len(self.X)
-
-    def __getitem__(self, idx):
-        x = self.X[idx] / 255
-        y = self.Y[idx]
-
-        return x, y
-
-
-dataset_full = DatasetApples()
-train_test_split = int(len(dataset_full) * TRAIN_TEST_SPLIT)
-dataset_train, dataset_test = torch.utils.data.random_split(
-    dataset_full,
-    [train_test_split, len(dataset_full) - train_test_split],
-    generator=torch.Generator().manual_seed(0)
-)
+random_seed = 1
+torch.backends.cudnn.enabled = False
+torch.manual_seed(random_seed)
 
 data_loader_train = torch.utils.data.DataLoader(
-    dataset=dataset_train,
-    batch_size=BATCH_SIZE,
-    shuffle=True
-)
+  torchvision.datasets.MNIST('../../../data', train=True, download=True,
+                             transform=torchvision.transforms.Compose([
+                               torchvision.transforms.ToTensor(),
+                               torchvision.transforms.Normalize(
+                                 (0.1307,), (0.3081,))
+                             ])),
+  batch_size=batch_size_train, shuffle=True)
 
 data_loader_test = torch.utils.data.DataLoader(
-    dataset=dataset_test,
-    batch_size=BATCH_SIZE,
-    shuffle=False
-)
+  torchvision.datasets.MNIST('../../../data', train=False, download=True,
+                             transform=torchvision.transforms.Compose([
+                               torchvision.transforms.ToTensor(),
+                               torchvision.transforms.Normalize(
+                                 (0.1307,), (0.3081,))
+                             ])),
+  batch_size=batch_size_test, shuffle=True)
 
 class LossCrossEntropy(torch.nn.Module):
     def __init__(self):
@@ -142,7 +119,7 @@ class TransitionLayer(torch.nn.Module):
 class ModelResnet(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = torch.nn.Conv2d(in_channels=3, out_channels=4,
+        self.conv1 = torch.nn.Conv2d(in_channels=1, out_channels=4,
                                      kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
         self.bn1 = torch.nn.BatchNorm2d(num_features=4)
         self.max_pool = torch.nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -187,7 +164,7 @@ class Model(torch.nn.Module):
     def __init__(self):
         super().__init__()
         self.encoder = torch.nn.Sequential(
-            torch.nn.Conv2d(in_channels=3, out_channels=8, kernel_size=5, stride=2, padding=1),
+            torch.nn.Conv2d(in_channels=1, out_channels=8, kernel_size=5, stride=2, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(num_features=8),
             torch.nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, stride=1, padding=1),
@@ -205,11 +182,6 @@ class Model(torch.nn.Module):
         out = F.softmax(out, dim=1)
         return out
 
-#x = torch.randn(size=(64,3,100,100))
-#model = ModelResnet()
-#y = model.forward(x)
-#print(y.shape)
-#quit()
 
 model = ModelResnet()
 loss_func = LossCrossEntropy()
@@ -228,7 +200,27 @@ for stage in ['train', 'test']:
     ]:
         metrics[f'{stage}_{metric}'] = []
 
-for epoch in range(1, 20):
+def createFile(path,filename):
+    name = path+'/'+filename  # Name of text file coerced with +.txt
+    try:
+        file = open(name,'a')   # Trying to create a new file or open one
+        file.close()
+    except:
+        print('File not created')
+
+def writeToFile(path, value):
+    try:
+        file = open(path,'a')
+        addToFile = value
+        file.write("\n" + addToFile)
+        file.close()
+    except:
+        print('data not written in file')
+
+filepath_loss = "/Users/reinisrozenbahs/BD_dati_txt"
+createFile(filepath_loss, "demo.txt")
+
+for epoch in range(1, 5):
 
     for data_loader in [data_loader_train, data_loader_test]:
         metrics_epoch = {key: [] for key in metrics.keys()}
@@ -268,6 +260,8 @@ for epoch in range(1, 20):
 
             acc = np.average((idx_y == idx_y_prim) * 1.0)
             metrics_epoch[f'{stage}_acc'].append(acc)
+            print(f'accuracy: {str(acc)}')
+            writeToFile("/Users/reinisrozenbahs/BD_dati_txt/demo.txt", str(acc))
 
         metrics_strs = []
         for key in metrics_epoch.keys():
@@ -275,6 +269,8 @@ for epoch in range(1, 20):
                 value = np.mean(metrics_epoch[key])
                 metrics[key].append(value)
                 metrics_strs.append(f'{key}: {round(value, 2)}')
+        random_string = ' '.join(metrics_strs)
+        #writeToFile("/Users/reinisrozenbahs/BD_dati_txt/demo.txt", random_string)
 
         print(f'epoch: {epoch} {" ".join(metrics_strs)}')
 
